@@ -45,11 +45,11 @@ Installed copies check GitHub Releases for a newer version about 15 seconds afte
 - **Settings → Updates** has a **Check for updates** button and an **Install updates automatically** toggle. With the toggle off, Beam still tells you about new versions but waits for you to click **Download**.
 - Development runs (`npm start`) never update themselves.
 
-How a release reaches users:
+How a release reaches users: create a release on GitHub with a tag such as `v0.0.2`, or push the tag from git.
 
-1. Bump `version` in `package.json`, then commit.
-2. Tag the commit `v<version>` (for example `git tag v1.0.1 && git push --tags`). CI checks that the tag matches `package.json`.
-3. CI builds and attaches the installers plus `latest.yml` / `latest-mac.yml` to a **draft** release. Updaters ignore drafts, so nothing ships until you click **Publish**.
+- CI stamps the build with the tag's version, so you don't need to edit `package.json` first.
+- CI builds both platforms and attaches the installers plus `latest.yml` / `latest-mac.yml` to the release. This takes a few minutes.
+- If the release already exists, it stays as you left it, published or draft. If CI creates it (tag pushed from git), it's a **draft**: updaters ignore drafts, so nothing ships until you click **Publish**.
 
 The repository must be **public**, since installed apps read releases without a token. For a self-hosted feed, put the build output (installers + `latest*.yml`) on any HTTPS server and start Beam with `BEAM_UPDATE_URL=https://your.server/path/`.
 
@@ -64,7 +64,7 @@ The repository must be **public**, since installed apps read releases without a 
 | Windows x64 | `windows-latest` | `Beam-Setup-x.y.z.exe` (NSIS) + `latest.yml`, after `npm test` passes |
 | macOS Apple silicon (arm64 only) | `macos-14` | `Beam-x.y.z-arm64.dmg`, plus the `.zip` and `latest-mac.yml` used by the updater |
 
-To publish a release, push a tag such as `v1.0.0`. The installers are then attached to a **draft** GitHub Release for you to review and publish.
+To publish a release, create one on GitHub with a tag such as `v0.0.2`, or push a tag from git. CI attaches the installers to it. See [Updates](#updates).
 
 **macOS signing.** If you haven't added signing secrets, the Mac app is *ad-hoc* signed. Apple silicon requires at least that much before it will run an app. Gatekeeper still blocks downloaded ad-hoc apps, so on first launch, right-click the app → **Open**, or run `xattr -cr /Applications/Beam.app`. To sign properly and notarize, add these repository secrets:
 

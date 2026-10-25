@@ -31,8 +31,20 @@ jobs:
       - name: Test protocol and crypto
         run: npm test
 
+      - name: Take version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not a version like v1.2.3"
+            exit 1
+          fi
+          echo "TAG_VERSION=$v" >> "$GITHUB_ENV"
+
       - name: Build installer
-        run: npx electron-builder --win --x64 --publish never
+        shell: bash
+        run: npx electron-builder --win --x64 --publish never ${TAG_VERSION:+-c.extraMetadata.version=$TAG_VERSION}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -57,6 +69,17 @@ jobs:
 
       - run: npm ci
 
+      - name: Take version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if ! [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME is not a version like v1.2.3"
+            exit 1
+          fi
+          echo "TAG_VERSION=$v" >> "$GITHUB_ENV"
+
       - name: Build DMG (arm64)
         shell: bash
         env:
@@ -73,7 +96,7 @@ jobs:
             if [ -n "$NOTARY_APPLE_ID" ]; then
               export APPLE_ID="$NOTARY_APPLE_ID" APPLE_APP_SPECIFIC_PASSWORD="$NOTARY_PASSWORD" APPLE_TEAM_ID="$NOTARY_TEAM_ID"
             fi
-            npx electron-builder --mac --arm64 --publish never
+            npx electron-builder --mac --arm64 --publish never ${TAG_VERSION:+-c.extraMetadata.version=$TAG_VERSION}
           else
             echo "::warning::No Apple signing certificate configured; building an ad-hoc signed app."
             # Apple silicon refuses to run unsigned code, and electron-builder has no
@@ -82,6 +105,7 @@ jobs:
             node -e "
               const b = require('./package.json').build;
               b.mac = { ...b.mac, identity: '-', hardenedRuntime: false };
+              if (process.env.TAG_VERSION) b.extraMetadata = { ...b.extraMetadata, version: process.env.TAG_VERSION };
               require('fs').writeFileSync('adhoc-build.json', JSON.stringify(b));
             "
             npx electron-builder --mac --arm64 --publish never --config adhoc-build.json
@@ -99,31 +123,30 @@ jobs:
           if-no-files-found: error
 
   release:
-    name: Draft release
+    name: Attach to release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Check tag matches package.json version
-        shell: bash
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
-            exit 1
-          fi
-
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: artifacts/*
-          draft: true
-          generate_release_notes: true
+      - name: Upload installers and update metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          ls -l artifacts
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Release already made on GitHub: add the downloads, keep it published/draft as it is.
+            gh release upload "$TAG" artifacts/* --clobber
+          else
+            # Tag pushed from git: create a draft so nothing ships until it's published.
+            gh release create "$TAG" artifacts/* --draft --generate-notes --title "$TAG"
+          fi
