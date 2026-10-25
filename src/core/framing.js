@@ -24,6 +24,7 @@ class FramedSocket {
     this.busy = false;
     this.closed = false;
     this.error = null;
+    this.failHooks = new Set();
 
     socket.on('data', (d) => this._onData(d));
     socket.on('error', (e) => this._fail(e));
@@ -35,6 +36,7 @@ class FramedSocket {
     this.closed = true;
     this.error = err;
     for (const w of this.waiters.splice(0)) w.reject(err);
+    for (const hook of [...this.failHooks]) hook(err);
     if (this.onClose) this.onClose(err);
   }
 
@@ -197,13 +199,13 @@ class FramedSocket {
     return new Promise((resolve, reject) => {
       const done = (err) => {
         this.socket.off('drain', onDrain);
-        this.socket.off('close', onClose);
+        this.failHooks.delete(onFail);
         err ? reject(err) : resolve();
       };
       const onDrain = () => done();
-      const onClose = () => done(this.error || new Error('connection closed'));
+      const onFail = (err) => done(err);
       this.socket.on('drain', onDrain);
-      this.socket.on('close', onClose);
+      this.failHooks.add(onFail);
     });
   }
 }

@@ -58,6 +58,7 @@ Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper will warn the
 | Integrity | Each file is checked with SHA-256 end to end. Files are written to a `.beampart` temp file and only renamed after they verify. |
 | Untrusted input | Remote file names are sanitized (no path traversal, no reserved Windows names) and never overwrite existing files. Frame size, text size and file count are all capped, and stalled or unauthenticated connections time out. |
 | Discovery | Broadcast beacons contain only a display name, a public fingerprint and a port. They are never trusted: the handshake verifies that the device at an address really has the expected identity. |
+| Local data | The activity history (`history.json` in the app's data folder) keeps sent and received **text in plain text** on each device, so you can copy it later. **Activity → Clear** deletes it. This copy stays on your own disk; nothing is stored on the network. |
 | App hardening | `contextIsolation`, `sandbox`, no `nodeIntegration`, a strict CSP, navigation and new windows blocked. File bytes never cross IPC; the main process streams from disk. |
 
 Wire protocol: see `src/core/handshake.js` (handshake) and `src/core/node.js` (messages).
@@ -69,6 +70,7 @@ Wire protocol: see `src/core/handshake.js` (handshake) and `src/core/node.js` (m
 - **Linux global shortcut:** works on X11. On Wayland, most compositors don't allow apps to grab global shortcuts. Bind a system shortcut to open the Beam window instead, or use the tray icon. *Start at login* is not available on Linux; add Beam to your desktop's autostart instead.
 - **Networks with client isolation** (many guest and public Wi-Fi networks) block device-to-device traffic. Beam can't work on them, and that is by design.
 - Folders aren't sent directly. Zip them first.
+- **Windows notifications** usually don't show when you run from source (`npm start`), because Windows needs a Start-menu shortcut that matches the app ID. They do show once Beam is installed with the installer.
 
 ## Development
 

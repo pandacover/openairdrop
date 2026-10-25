@@ -182,9 +182,13 @@ function setTransfer(id, patch) {
   pushState('transfers');
 }
 
+let cachedIcon = null;
+// nativeImage reads from inside the asar; a plain path may not survive packaging.
+const appIcon = () => (cachedIcon ||= nativeImage.createFromPath(path.join(ASSETS, 'icon.png')));
+
 function notify(title, body, onClick) {
   if (!settings.data.notifications || !Notification.isSupported()) return;
-  const n = new Notification({ title, body, icon: path.join(ASSETS, 'icon.png'), silent: false });
+  const n = new Notification({ title, body, icon: appIcon(), silent: false });
   if (onClick) n.on('click', onClick);
   n.show();
 }

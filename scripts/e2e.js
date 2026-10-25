@@ -18,10 +18,13 @@ const shots = path.join(root, '.profiles', 'shots');
 async function launch(name, port) {
   const env = { ...process.env };
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({
-    args: [root, `--beam-profile=${path.join(work, name)}`, `--beam-port=${port}`],
-    env,
-  });
+  // BEAM_EXE=dist/win-unpacked/Beam.exe runs the test against a packaged build.
+  const profileArgs = [`--beam-profile=${path.join(work, name)}`, `--beam-port=${port}`];
+  const app = await electron.launch(
+    process.env.BEAM_EXE
+      ? { executablePath: path.resolve(process.env.BEAM_EXE), args: profileArgs, env }
+      : { args: [root, ...profileArgs], env }
+  );
   app.process().stdout.on('data', (d) => process.stdout.write(`[${name}] ${d}`));
   const win = await waitForWindow(app, 'main/index.html');
   await win.waitForSelector('#me-name:not(:empty)');

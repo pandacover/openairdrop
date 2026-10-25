@@ -140,7 +140,8 @@ class BeamNode extends EventEmitter {
         this.emit('paired', peer);
         return { paired: true, peer };
       }
-      return { paired: false, peer, reason: local ? 'rejected by the other device' : 'cancelled' };
+      const remoteSaidNo = local || ac.signal.aborted; // abort == remote answered no first
+      return { paired: false, peer, reason: remoteSaidNo ? 'rejected by the other device' : 'cancelled' };
     } finally {
       channel.close();
     }
@@ -171,6 +172,7 @@ class BeamNode extends EventEmitter {
       throw new RemoteError('not_paired', 'This device is not paired yet');
     }
     const onAbort = () => channel.destroy(new Error('cancelled'));
+    let remoteFailure = null;
     signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
@@ -180,9 +182,10 @@ class BeamNode extends EventEmitter {
       });
       const res = expectMsg(await channel.recv(C.PROMPT_TIMEOUT_MS + 5000), MSG.OFFER_RES);
       if (!res.accepted) throw new RemoteError('declined', 'The other device declined the transfer');
+      // Only arm the idle timeout now: before this point the receiver may be waiting on its user.
+      channel.framed.socket.setTimeout(C.IDLE_TIMEOUT_MS, () => channel.destroy(new Error('the other device stopped responding')));
 
       // From here on listen for the final ACK, or an ERROR sent mid-stream.
-      let remoteFailure = null;
       const finished = new Promise((resolve, reject) => {
         channel.framed.onClose = (err) => reject(remoteFailure || err);
         channel.setHandler((type, body) => {
@@ -191,6 +194,7 @@ class BeamNode extends EventEmitter {
             const e = parseJson(body);
             remoteFailure = new RemoteError(e.code || 'remote_error', e.message);
             reject(remoteFailure);
+            channel.destroy(remoteFailure); // stop streaming right away
             return;
           }
           throw new Error('protocol violation');
@@ -229,7 +233,7 @@ class BeamNode extends EventEmitter {
       return { peer, total };
     } catch (e) {
       if (signal?.aborted) throw new Error('cancelled');
-      throw e;
+      throw remoteFailure || e;
     } finally {
       signal?.removeEventListener('abort', onAbort);
       channel.close();
@@ -364,6 +368,14 @@ class BeamNode extends EventEmitter {
         } catch {}
         throw new Error(message);
       };
+      const failWith = (reject, message) => {
+        try {
+          fail(message);
+        } catch (e) {
+          reject(e);
+        }
+      };
+      const writeError = (e) => `cannot write file: ${e.code || e.message}`;
 
       channel.setHandler((type, body) => {
         switch (type) {
@@ -382,39 +394,45 @@ class BeamNode extends EventEmitter {
             if (!spec || m.name !== spec.name || m.size !== spec.size) fail('file does not match offer');
             const partPath = path.join(dir, `${spec.safeName}.${transferId.slice(0, 8)}.beampart`);
             const ws = fs.createWriteStream(partPath, { flags: 'wx' });
-            ws.on('error', () => {});
-            state.current = { spec, partPath, ws, bytes: 0, hash: crypto.createHash('sha256') };
+            const cur = { spec, partPath, ws, bytes: 0, hash: crypto.createHash('sha256'), error: null };
+            ws.on('error', (e) => (cur.error = cur.error || e));
+            state.current = cur;
             return new Promise((res, rej) => {
               ws.once('open', res);
-              ws.once('error', (e) => {
-                try {
-                  fail(`cannot write file: ${e.code || e.message}`);
-                } catch (err) {
-                  rej(err);
-                }
-              });
+              ws.once('error', (e) => failWith(rej, writeError(e)));
             });
           }
           case MSG.FILE_CHUNK: {
             const cur = state.current;
             if (!cur) fail('chunk outside of a file');
+            if (cur.error) fail(writeError(cur.error));
             if (cur.bytes + body.length > cur.spec.size) fail('file larger than announced');
             cur.bytes += body.length;
             state.received += body.length;
             cur.hash.update(body);
             this.emit('incoming-progress', { transferId, peer, received: state.received, total: offer.total });
-            if (!cur.ws.write(body)) return new Promise((r) => cur.ws.once('drain', r));
-            return;
+            if (cur.ws.write(body)) return;
+            // Disk is slower than the network: hold the socket until the file catches up.
+            return new Promise((res, rej) => {
+              const onDrain = () => (cur.ws.off('error', onError), res());
+              const onError = (e) => (cur.ws.off('drain', onDrain), failWith(rej, writeError(e)));
+              cur.ws.once('drain', onDrain);
+              cur.ws.once('error', onError);
+            });
           }
           case MSG.FILE_END: {
             const cur = state.current;
             if (!cur) fail('unexpected end of file');
+            if (cur.error) fail(writeError(cur.error));
             const { sha256 } = parseJson(body);
             if (cur.bytes !== cur.spec.size) fail('file size mismatch');
             if (cur.hash.digest('hex') !== sha256) fail('file integrity check failed');
             return new Promise((res, rej) => {
-              cur.ws.end(async () => {
+              cur.ws.end(async (endErr) => {
                 try {
+                  if (endErr || cur.error) throw endErr || cur.error;
+                  // Belt and braces: what reached the disk must be what we verified.
+                  if ((await fs.promises.stat(cur.partPath)).size !== cur.spec.size) throw new Error('short write');
                   const finalPath = await reserveUniquePath(dir, cur.spec.safeName);
                   await fs.promises.rename(cur.partPath, finalPath);
                   state.current = null;
@@ -424,11 +442,7 @@ class BeamNode extends EventEmitter {
                   this.emit('file', info);
                   res();
                 } catch (e) {
-                  try {
-                    fail(`cannot save file: ${e.code || e.message}`);
-                  } catch (err) {
-                    rej(err);
-                  }
+                  failWith(rej, `cannot save file: ${e.code || e.message}`);
                 }
               });
             });

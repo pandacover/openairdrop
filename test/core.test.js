@@ -159,6 +159,37 @@ test('text and files transfer intact', async () => {
   }
 });
 
+test('disk write failure on the receiver is reported, not stalled or saved', async () => {
+  const { a, b, port } = await pairedPair();
+  const orig = fs.createWriteStream;
+  fs.createWriteStream = (...args) => {
+    const ws = orig(...args);
+    const write = ws.write.bind(ws);
+    let n = 0;
+    ws.write = (chunk, ...rest) => {
+      n += chunk.length;
+      if (n > 1024 * 1024) process.nextTick(() => ws.destroy(Object.assign(new Error('disk full'), { code: 'ENOSPC' })));
+      return write(chunk, ...rest);
+    };
+    return ws;
+  };
+  try {
+    const src = path.join(tmp, 'fails.bin');
+    fs.writeFileSync(src, crypto.randomBytes(4 * 1024 * 1024));
+    const saved = [];
+    b.on('file', (f) => saved.push(f));
+    const t0 = Date.now();
+    await assert.rejects(a.send({ host: '127.0.0.1', port }, { files: [src] }), /ENOSPC/);
+    assert.ok(Date.now() - t0 < 5000, 'should fail fast, not wait for the idle timeout');
+    await new Promise((r) => setTimeout(r, 100));
+    assert.strictEqual(saved.length, 0);
+    assert.deepStrictEqual(fs.readdirSync(b.dir), [], 'partial file must be cleaned up');
+  } finally {
+    fs.createWriteStream = orig;
+    await b.close();
+  }
+});
+
 test('declined offer is reported to the sender', async () => {
   const a = makeNode('Alice');
   const b = makeNode('Bob', { offerAnswer: false });
