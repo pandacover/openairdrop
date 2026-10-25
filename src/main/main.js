@@ -13,6 +13,7 @@ const {
   clipboard,
   screen,
   nativeImage,
+  nativeTheme,
   safeStorage,
 } = require('electron');
 const crypto = require('crypto');
@@ -50,6 +51,7 @@ const ASSETS = path.join(__dirname, '..', '..', 'assets');
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space';
+const POPUP_WIDTH = 600;
 
 let settings, trustedStore, historyStore, identity, node, discovery;
 let tray = null;
@@ -255,7 +257,7 @@ async function startNetwork() {
     addHistory({ direction: 'in', kind: 'file', peer: { id: peer.fp, name: peer.name }, path: p, name, size });
   });
   node.on('incoming-start', ({ transferId, peer, files, total }) => {
-    if (files.length) setTransfer(transferId, { direction: 'in', peer: peer.name, files, total, done: 0, status: 'active' });
+    if (files.length) setTransfer(transferId, { direction: 'in', peerId: peer.fp, peer: peer.name, files, total, done: 0, status: 'active' });
   });
   node.on('incoming-progress', ({ transferId, received, total }) => {
     if (transfers.has(transferId)) setTransfer(transferId, { done: received, total });
@@ -332,7 +334,7 @@ async function sendTo({ deviceId, text, paths }) {
   settings.data.lastDeviceId = deviceId;
   settings.save();
   if (files.length) {
-    setTransfer(id, { direction: 'out', peer: device.name, files: files.map((f) => path.basename(f)), total: 0, done: 0, status: 'active' });
+    setTransfer(id, { direction: 'out', peerId: deviceId, peer: device.name, files: files.map((f) => path.basename(f)), total: 0, done: 0, status: 'active' });
   }
   try {
     let lastPush = 0;
@@ -410,13 +412,13 @@ function hardenContents(win) {
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 980,
-    height: 660,
-    minWidth: 760,
-    minHeight: 520,
+    width: 880,
+    height: 580,
+    minWidth: 720,
+    minHeight: 460,
     show: false,
     title: 'Beam',
-    backgroundColor: '#0f1117',
+    backgroundColor: themeBackground(),
     icon: path.join(ASSETS, 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: secureWebPreferences(),
@@ -426,12 +428,17 @@ function createMainWindow() {
   mainWindow.once('ready-to-show', () => {
     if (!startHidden) mainWindow.show();
   });
+  mainWindow.on('focus', () => discovery?.refresh());
   mainWindow.on('close', (e) => {
     if (!quitting) {
       e.preventDefault();
       mainWindow.hide();
     }
   });
+}
+
+function themeBackground() {
+  return nativeTheme.shouldUseDarkColors ? '#18181b' : '#ffffff';
 }
 
 function showMain() {
@@ -443,8 +450,8 @@ function showMain() {
 
 function createPopup() {
   popupWindow = new BrowserWindow({
-    width: 580,
-    height: 380,
+    width: POPUP_WIDTH,
+    height: 92,
     show: false,
     frame: false,
     resizable: false,
@@ -454,7 +461,7 @@ function createPopup() {
     fullscreenable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    backgroundColor: '#161a23',
+    backgroundColor: themeBackground(),
     title: 'Beam Quick Send',
     webPreferences: secureWebPreferences(),
   });
@@ -635,6 +642,26 @@ function registerIpc() {
     pushState('history');
   });
   handle('hide-popup', () => popupWindow?.hide());
+  // The popup sizes itself to its content.
+  handle('resize-popup', (height) => {
+    const h = Math.round(Math.min(Math.max(Number(height) || 0, 60), 520));
+    if (!popupWindow || popupWindow.getSize()[1] === h) return;
+    // Non-resizable windows have their size pinned on Windows; unlock briefly.
+    popupWindow.setResizable(true);
+    popupWindow.setMinimumSize(POPUP_WIDTH, 60);
+    popupWindow.setSize(POPUP_WIDTH, h);
+    popupWindow.setResizable(false);
+  });
+  handle('describe-files', (paths) =>
+    (Array.isArray(paths) ? paths : []).map((p) => {
+      try {
+        const st = fs.statSync(p);
+        return { path: p, name: path.basename(p), size: st.size, isFile: st.isFile() };
+      } catch {
+        return { path: p, name: path.basename(p), size: 0, isFile: false, missing: true };
+      }
+    })
+  );
   handle('open-main', () => {
     popupWindow?.hide();
     showMain();

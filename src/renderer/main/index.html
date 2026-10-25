@@ -8,112 +8,154 @@
     <link rel="stylesheet" href="main.css" />
   </head>
   <body>
-    <aside>
-      <div class="brand"><img src="../../../assets/icon.png" alt="" /> Beam</div>
-      <div class="me">
-        <div class="me-name" id="me-name"></div>
-        <div class="muted small">This device · port <span id="me-port"></span></div>
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <svg class="mark" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+          <rect class="mark-bg" width="24" height="24" rx="5.5" />
+          <circle class="mark-ink" cx="8.1" cy="15.9" r="2.65" />
+          <line class="mark-line" x1="8.1" y1="15.9" x2="14.5" y2="9.5" />
+          <circle class="mark-ring" cx="15.9" cy="8.1" r="1.9" />
+        </svg>
+        <span class="app-name">Beam</span>
+        <button class="icon-btn" id="open-settings" title="Settings"><span data-icon="settings"></span></button>
       </div>
-      <nav>
-        <button class="nav active" data-view="devices">📡 Devices</button>
-        <button class="nav" data-view="activity">🕘 Activity <span id="activity-badge" class="badge hidden"></span></button>
-        <button class="nav" data-view="settings">⚙️ Settings</button>
-      </nav>
-      <div class="hint small muted">
-        Quick send from anywhere:<br />
-        <kbd id="shortcut-hint"></kbd>
-        <div id="shortcut-warn" class="warn hidden">Shortcut unavailable — pick another in Settings.</div>
+
+      <nav class="device-list" id="device-list" aria-label="Devices"></nav>
+
+      <div class="sidebar-foot">
+        <form id="add-form" class="add-form" hidden>
+          <input type="text" id="add-input" placeholder="192.168.1.20" aria-label="Device address" />
+          <div id="add-status" class="add-status"></div>
+        </form>
+        <button class="text-btn" id="add-toggle"><span data-icon="plus" data-size="14"></span> Add by address</button>
+        <div class="shortcut-hint" id="shortcut-hint" title="Open quick send from anywhere"></div>
       </div>
     </aside>
 
-    <section id="view-devices" class="view">
-      <header>
-        <div>
-          <h1>Devices</h1>
-          <p class="muted">Devices running Beam on your network. Pair once, then send instantly.</p>
-        </div>
-        <button id="refresh" class="ghost" title="Search again">⟳ Refresh</button>
-      </header>
-      <div id="device-list" class="device-list"></div>
-      <form id="add-form" class="add-form">
-        <input type="text" id="add-input" placeholder="Not showing up? Add by address, e.g. 192.168.1.20" />
-        <button type="submit">Add</button>
-      </form>
-      <div id="add-status" class="small muted"></div>
-
-      <div id="composer" class="composer hidden">
-        <div class="composer-head">
-          Send to <strong id="composer-target"></strong>
-        </div>
-        <textarea id="composer-text" rows="3" placeholder="Type a message, paste or drop files…"></textarea>
-        <div id="composer-files" class="files"></div>
-        <div class="composer-actions">
-          <button type="button" class="ghost" id="composer-attach">📎 Attach files</button>
-          <span id="composer-status" class="small muted"></span>
-          <button type="button" class="primary" id="composer-send">Send</button>
-        </div>
-      </div>
-    </section>
-
-    <section id="view-activity" class="view hidden">
-      <header>
-        <div>
-          <h1>Activity</h1>
-          <p class="muted">Messages and files sent and received on this device.</p>
-        </div>
-        <div class="row">
-          <button id="open-downloads" class="ghost">📂 Received files</button>
-          <button id="clear-history" class="ghost">Clear</button>
-        </div>
-      </header>
-      <div id="transfers"></div>
-      <div id="history" class="history"></div>
-    </section>
-
-    <section id="view-settings" class="view hidden">
-      <header>
-        <div>
-          <h1>Settings</h1>
-        </div>
-      </header>
-      <div class="settings">
-        <label class="field">
-          <span>Device name</span>
-          <input type="text" id="set-name" maxlength="64" />
-        </label>
-        <label class="field">
-          <span>Quick send shortcut</span>
-          <div class="row">
-            <input type="text" id="set-shortcut" readonly title="Click, then press a key combination" />
-            <button type="button" id="reset-shortcut" class="ghost">Reset</button>
+    <main class="pane">
+      <!-- Thread with a paired device -->
+      <section id="pane-thread" class="pane-section" hidden>
+        <header class="pane-head">
+          <div class="pane-title">
+            <span class="name" id="thread-name"></span>
+            <span class="sub" id="thread-sub"></span>
           </div>
-          <small class="muted">Click the box and press the new combination.</small>
-          <small id="shortcut-error" class="error"></small>
-        </label>
-        <label class="field">
-          <span>Save received files to</span>
-          <div class="row">
-            <input type="text" id="set-dir" readonly />
-            <button type="button" id="choose-dir">Change…</button>
+          <button class="text-btn danger" id="unpair">Unpair</button>
+        </header>
+        <div class="thread" id="thread"></div>
+        <form class="composer" id="composer">
+          <div class="files" id="composer-files" hidden></div>
+          <div class="composer-row">
+            <button type="button" class="icon-btn" id="composer-attach" title="Attach files"><span data-icon="paperclip"></span></button>
+            <textarea id="composer-text" rows="1" placeholder="Message"></textarea>
+            <button type="submit" class="icon-btn solid" id="composer-send" title="Send (Enter)"><span data-icon="send"></span></button>
           </div>
-        </label>
-        <label class="toggle"><input type="checkbox" id="set-auto" /> Accept transfers from paired devices automatically</label>
-        <label class="toggle"><input type="checkbox" id="set-copy" /> Copy received text to the clipboard</label>
-        <label class="toggle"><input type="checkbox" id="set-notify" /> Show notifications</label>
-        <label class="toggle" id="login-row"><input type="checkbox" id="set-login" /> Start Beam when I log in</label>
+          <div class="composer-status" id="composer-status" hidden></div>
+        </form>
+        <div class="drop" id="drop" hidden>Drop files to send</div>
+      </section>
 
-        <div class="identity">
-          <div class="small muted">Device identity fingerprint</div>
-          <div class="mono" id="set-fp"></div>
-          <p class="small muted">
-            Each device has its own key pair, generated locally. Transfers go directly between devices over the local network,
-            encrypted end-to-end (X25519 + AES-256-GCM, Ed25519-authenticated). Nothing is stored or relayed by any server.
+      <!-- Unpaired device -->
+      <section id="pane-pair" class="pane-section" hidden>
+        <header class="pane-head">
+          <div class="pane-title">
+            <span class="name" id="pair-name"></span>
+            <span class="sub" id="pair-sub"></span>
+          </div>
+        </header>
+        <div class="pair-body">
+          <h2>Pair with <span id="pair-name-2"></span></h2>
+          <p class="muted">
+            Paired devices can send each other messages and files. Both screens will show a 6‑digit code. Confirm on each
+            device only if the codes match.
+          </p>
+          <button class="btn primary" id="pair-btn">Pair</button>
+          <div class="pair-error error" id="pair-error"></div>
+          <dl class="facts">
+            <dt>Device ID</dt>
+            <dd class="mono" id="pair-fp"></dd>
+          </dl>
+        </div>
+      </section>
+
+      <!-- Nothing yet -->
+      <section id="pane-empty" class="pane-section center" hidden>
+        <div class="empty">
+          <div class="empty-title">No devices found yet</div>
+          <p class="muted">
+            Open Beam on another computer on the same network and it will appear on the left. If it doesn't, your network
+            may block discovery. Add it by address instead.
           </p>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <!-- Settings -->
+      <section id="pane-settings" class="pane-section" hidden>
+        <header class="pane-head">
+          <div class="pane-title"><span class="name">Settings</span></div>
+        </header>
+        <div class="settings">
+          <h3>This device</h3>
+          <div class="group">
+            <label class="row">
+              <span class="label">Name</span>
+              <input type="text" id="set-name" maxlength="64" />
+            </label>
+            <div class="row">
+              <span class="label">Device ID<small>Others see this when pairing</small></span>
+              <span class="value mono" id="set-fp"></span>
+            </div>
+          </div>
+
+          <h3>Quick send</h3>
+          <div class="group">
+            <div class="row">
+              <span class="label">Shortcut<small id="shortcut-help">Click, then press a new combination</small></span>
+              <button class="shortcut-field" id="set-shortcut" title="Click to change"></button>
+            </div>
+          </div>
+
+          <h3>Receiving</h3>
+          <div class="group">
+            <div class="row">
+              <span class="label">Save files to<small class="path" id="set-dir"></small></span>
+              <button class="btn" id="choose-dir">Change…</button>
+            </div>
+            <label class="row">
+              <span class="label">Accept from paired devices without asking</span>
+              <input type="checkbox" class="switch" id="set-auto" />
+            </label>
+            <label class="row">
+              <span class="label">Copy received text to clipboard</span>
+              <input type="checkbox" class="switch" id="set-copy" />
+            </label>
+            <label class="row">
+              <span class="label">Notifications</span>
+              <input type="checkbox" class="switch" id="set-notify" />
+            </label>
+          </div>
+
+          <h3>General</h3>
+          <div class="group">
+            <label class="row" id="login-row">
+              <span class="label">Open at login</span>
+              <input type="checkbox" class="switch" id="set-login" />
+            </label>
+            <div class="row">
+              <span class="label">History<small>Messages are kept on this device only</small></span>
+              <button class="btn danger" id="clear-history">Clear history</button>
+            </div>
+          </div>
+
+          <p class="footnote muted">
+            Devices connect directly over your local network. Every connection is end-to-end encrypted (X25519, AES‑256‑GCM)
+            and authenticated with each device's own Ed25519 key. Nothing passes through or is stored on a server.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <div id="modal" class="modal" role="dialog" aria-modal="true" hidden>
       <div class="modal-card" id="modal-card"></div>
     </div>
 

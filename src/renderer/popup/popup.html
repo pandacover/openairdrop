@@ -9,30 +9,30 @@
   </head>
   <body>
     <div id="app">
-      <header>
-        <div class="brand"><span class="logo"></span>Send to</div>
-        <div id="devices" class="devices" role="radiogroup" aria-label="Target device"></div>
-        <button class="ghost close" id="close" title="Close (Esc)">✕</button>
-      </header>
+      <section id="composer">
+        <div class="input-row">
+          <textarea id="text" rows="1" placeholder="Message, or drop files" spellcheck="true"></textarea>
+          <button class="icon-btn" id="attach" title="Attach files (Ctrl+O)"><span data-icon="paperclip"></span></button>
+          <button class="icon-btn solid" id="send" title="Send (Enter)"><span data-icon="send"></span></button>
+        </div>
+        <div id="files" class="files" hidden></div>
+        <div class="bar" id="progress" hidden><div></div></div>
+        <footer>
+          <span class="to">To</span>
+          <div id="devices" class="devices" role="radiogroup" aria-label="Send to"></div>
+          <div id="status" class="status"></div>
+        </footer>
+      </section>
 
-      <div id="empty" class="empty hidden">
-        <p>No paired devices yet.</p>
-        <p class="muted small">Open Beam on both devices and pair them once — after that, they show up here.</p>
-        <button class="primary" id="open-main">Open Beam</button>
-      </div>
+      <section id="empty" class="empty" hidden>
+        <div>
+          <div class="empty-title">No paired devices</div>
+          <div class="muted">Pair a device in Beam once, then send to it from here.</div>
+        </div>
+        <button class="btn" id="open-main">Open Beam</button>
+      </section>
 
-      <main id="composer">
-        <textarea id="text" placeholder="Type a message, paste, or drop files here…" spellcheck="true"></textarea>
-        <div id="files" class="files"></div>
-      </main>
-
-      <footer>
-        <button class="ghost" id="attach" title="Attach files (Ctrl+O)">📎 Attach</button>
-        <div id="status" class="status muted small">Enter to send · Shift+Enter for new line · Esc to close</div>
-        <button class="primary" id="send">Send</button>
-      </footer>
-      <div class="progress hidden" id="progress"><div></div></div>
-      <div id="drop" class="drop hidden">Drop to attach</div>
+      <div id="drop" class="drop" hidden>Drop to attach</div>
     </div>
     <script src="../shared/util.js"></script>
     <script src="popup.js"></script>

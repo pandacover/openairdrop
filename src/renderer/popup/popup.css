@@ -1,49 +1,80 @@
+html,
 body {
+  height: auto;
   overflow: hidden;
-  background: var(--panel);
 }
 
 #app {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100vh;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
+}
+#composer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+#composer[hidden] {
+  display: none;
 }
 
-header {
+.input-row {
+  flex: 1;
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  -webkit-app-region: drag;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px 10px 10px 16px;
 }
-header > * {
-  -webkit-app-region: no-drag;
+textarea {
+  flex: 1;
+  border: 0;
+  padding: 3px 0;
+  resize: none;
+  font-size: 15px;
+  line-height: 22px;
+  min-height: 28px;
+  max-height: 160px;
+  background: transparent;
+  overflow-y: auto;
 }
-.brand {
+textarea:focus,
+textarea:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
+
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 10px;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+#progress {
+  margin: 0 16px 8px;
+}
+
+footer {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-  -webkit-app-region: drag;
+  min-height: 38px;
+  padding: 6px 10px 6px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--sidebar);
+  font-size: 12px;
 }
-.logo {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: url('../../../assets/icon.png') center / cover;
+.to {
+  color: var(--faint);
 }
 .devices {
   display: flex;
-  gap: 6px;
+  gap: 2px;
+  min-width: 0;
   overflow-x: auto;
-  flex: 1;
   scrollbar-width: none;
 }
 .devices::-webkit-scrollbar {
@@ -53,109 +84,78 @@ header > * {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  border-radius: 999px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
   white-space: nowrap;
-  font-size: 13px;
+  color: var(--muted);
+}
+.device:hover {
+  color: var(--text);
+  background: var(--fill);
 }
 .device[aria-checked='true'] {
-  background: var(--accent-soft);
-  border-color: var(--accent);
   color: var(--text);
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--border);
+  font-weight: 500;
 }
-.device.offline {
-  opacity: 0.55;
-}
-.close {
-  padding: 4px 9px;
-}
-
-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 12px 12px 0;
-  gap: 8px;
-}
-textarea {
-  flex: 1;
-  resize: none;
-  font-size: 15px;
-  background: transparent;
-  border-color: transparent;
-}
-textarea:focus {
-  border-color: transparent;
-  box-shadow: none;
-}
-.files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  max-height: 72px;
-  overflow-y: auto;
-}
-.files:empty {
-  display: none;
-}
-.files .chip span.name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 220px;
+.device.offline .dot {
+  background: var(--faint);
 }
 
-footer {
+.status {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-}
-.status {
-  flex: 1;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  gap: 4px;
+  color: var(--faint);
   white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 1;
+  min-width: 0;
+}
+.status .hint {
+  margin-left: 8px;
+}
+.status kbd {
+  font-size: 10px;
+  line-height: 14px;
+}
+.status.ok {
+  color: var(--online);
 }
 .status.error {
   color: var(--danger);
+  white-space: normal;
+  line-height: 1.3;
 }
-.status.ok {
-  color: var(--ok);
-}
-#progress {
-  border-radius: 0;
-  height: 3px;
+.status .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .empty {
-  flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 20px 40px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 16px;
 }
-.empty p {
-  margin: 4px 0;
-}
-.empty button {
-  margin-top: 12px;
+.empty-title {
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .drop {
   position: absolute;
-  inset: 6px;
-  border: 2px dashed var(--accent);
-  border-radius: 10px;
-  background: rgba(15, 17, 23, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 600;
+  inset: 4px;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 500;
   pointer-events: none;
 }

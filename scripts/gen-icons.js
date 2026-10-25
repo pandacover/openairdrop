@@ -31,38 +31,32 @@ function png(width, height, rgba) {
   ]);
 }
 
-function inPolygon(x, y, pts) {
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const [xi, yi] = pts[i];
-    const [xj, yj] = pts[j];
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
 function inRoundRect(x, y, r) {
   const cx = Math.min(Math.max(x, r), 1 - r);
   const cy = Math.min(Math.max(y, r), 1 - r);
   return (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
 }
 
-// Paper plane, normalised coordinates.
-const PLANE = [
-  [0.2, 0.47],
-  [0.8, 0.22],
-  [0.6, 0.8],
-  [0.47, 0.57],
-];
-const FOLD = [
-  [0.47, 0.57],
-  [0.8, 0.22],
-  [0.42, 0.72],
-];
+function distToSegment(x, y, [ax, ay], [bx, by]) {
+  const t = Math.max(0, Math.min(1, ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2)));
+  return Math.hypot(x - (ax + t * (bx - ax)), y - (ay + t * (by - ay)));
+}
 
-function render(size, { background, planeColor, foldColor }) {
+// The mark: a solid node linked to a hollow node -- one device sending to another.
+// Coordinates are in a 0..1 glyph box.
+function inMark(x, y, { r, hole, stroke }) {
+  const A = [0.22, 0.78];
+  const B = [0.78, 0.22];
+  const dB = Math.hypot(x - B[0], y - B[1]);
+  if (dB < hole) return false;
+  if (dB <= r) return true;
+  if (Math.hypot(x - A[0], y - A[1]) <= r) return true;
+  return distToSegment(x, y, A, B) <= stroke;
+}
+
+function render(size, { background, ink, inset, mark }) {
   const out = Buffer.alloc(size * size * 4);
-  const ss = 4;
+  const ss = 6;
   for (let py = 0; py < size; py++) {
     for (let px = 0; px < size; px++) {
       let r = 0, g = 0, b = 0, a = 0;
@@ -70,10 +64,11 @@ function render(size, { background, planeColor, foldColor }) {
         for (let sx = 0; sx < ss; sx++) {
           const x = (px + (sx + 0.5) / ss) / size;
           const y = (py + (sy + 0.5) / ss) / size;
+          const gx = (x - inset) / (1 - 2 * inset);
+          const gy = (y - inset) / (1 - 2 * inset);
           let c = null;
-          if (inPolygon(x, y, FOLD) && foldColor) c = foldColor;
-          else if (inPolygon(x, y, PLANE)) c = planeColor;
-          else if (background && inRoundRect(x, y, 0.22)) c = background(x, y);
+          if (gx >= 0 && gx <= 1 && gy >= 0 && gy <= 1 && inMark(gx, gy, mark)) c = ink;
+          else if (background && inRoundRect(x, y, 0.225)) c = background;
           if (c) {
             const ca = c[3] ?? 255;
             r += (c[0] * ca) / 255;
@@ -96,13 +91,6 @@ function render(size, { background, planeColor, foldColor }) {
   return png(size, size, out);
 }
 
-const gradient = (x, y) => {
-  const t = Math.min(1, Math.max(0, (x + y) / 2));
-  const from = [99, 102, 241];
-  const to = [6, 182, 212];
-  return [0, 1, 2].map((i) => Math.round(from[i] + (to[i] - from[i]) * t)).concat(255);
-};
-
 const root = path.join(__dirname, '..');
 const write = (rel, buf) => {
   fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
@@ -110,11 +98,16 @@ const write = (rel, buf) => {
   console.log('wrote', rel);
 };
 
-const appIcon = { background: gradient, planeColor: [255, 255, 255, 255], foldColor: [214, 222, 255, 255] };
-write('build/icon.png', render(512, appIcon));
-write('assets/icon.png', render(256, appIcon));
-write('assets/tray.png', render(32, appIcon));
+const BG = [24, 24, 27, 255];
+const WHITE = [250, 250, 250, 255];
+const BLACK = [0, 0, 0, 255];
+const fine = { r: 0.19, hole: 0.085, stroke: 0.062 };
+// Small sizes need chunkier strokes to stay legible.
+const bold = { r: 0.2, hole: 0.09, stroke: 0.075 };
+
+write('build/icon.png', render(512, { background: BG, ink: WHITE, inset: 0.21, mark: fine }));
+write('assets/icon.png', render(256, { background: BG, ink: WHITE, inset: 0.21, mark: fine }));
+write('assets/tray.png', render(32, { background: BG, ink: WHITE, inset: 0.2, mark: bold }));
 // macOS template images: black + alpha only, the OS tints them.
-const template = { background: null, planeColor: [0, 0, 0, 255], foldColor: [0, 0, 0, 150] };
-write('assets/trayTemplate.png', render(16, template));
-write('assets/trayTemplate@2x.png', render(32, template));
+write('assets/trayTemplate.png', render(16, { background: null, ink: BLACK, inset: 0.06, mark: bold }));
+write('assets/trayTemplate@2x.png', render(32, { background: null, ink: BLACK, inset: 0.06, mark: bold }));

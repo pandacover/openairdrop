@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('beam', {
   copyText: (text) => invoke('copy-text', text),
   clearHistory: () => invoke('clear-history'),
   hidePopup: () => invoke('hide-popup'),
+  resizePopup: (height) => invoke('resize-popup', height),
+  describeFiles: (paths) => invoke('describe-files', paths),
   openMain: () => invoke('open-main'),
   on: (channel, cb) => {
     if (!EVENTS.has(channel)) throw new Error(`unknown event ${channel}`);
