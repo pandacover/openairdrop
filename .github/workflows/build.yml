@@ -37,7 +37,11 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: beam-windows-x64
-          path: dist/*.exe
+          # latest.yml + blockmap are what installed copies read to auto-update.
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
           if-no-files-found: error
 
   macos:
@@ -86,7 +90,12 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: beam-macos-arm64
-          path: dist/*.dmg
+          # The updater installs from the .zip described in latest-mac.yml.
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.blockmap
+            dist/latest-mac.yml
           if-no-files-found: error
 
   release:
@@ -97,6 +106,17 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Check tag matches package.json version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts

@@ -30,6 +30,9 @@ contextBridge.exposeInMainWorld('beam', {
   resizePopup: (height) => invoke('resize-popup', height),
   describeFiles: (paths) => invoke('describe-files', paths),
   openMain: () => invoke('open-main'),
+  checkUpdates: () => invoke('check-updates'),
+  downloadUpdate: () => invoke('download-update'),
+  installUpdate: () => invoke('install-update'),
   on: (channel, cb) => {
     if (!EVENTS.has(channel)) throw new Error(`unknown event ${channel}`);
     const listener = (_e, payload) => cb(payload);

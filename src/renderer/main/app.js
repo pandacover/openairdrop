@@ -487,6 +487,67 @@ sc.addEventListener('keydown', async (e) => {
   sc.replaceChildren(...kbds(state.settings.shortcut));
 });
 
+// ------------------------------------------------------------------ updates
+
+function updateView(u, autoUpdate) {
+  const v = u.version;
+  switch (u.status) {
+    case 'disabled':
+      return { text: 'Updates are off for development builds' };
+    case 'checking':
+      return { text: 'Checking for updates…', button: 'Check for updates', busy: true };
+    case 'up-to-date':
+      return { text: `Up to date · checked ${clock(u.lastChecked)}`, button: 'Check for updates', action: 'check' };
+    case 'available':
+      if (!u.canAutoInstall) return { text: `Version ${v} is available`, button: 'Download…', action: 'download', pill: `Beam ${v} available` };
+      return autoUpdate
+        ? { text: `Downloading ${v}…`, button: 'Check for updates', busy: true }
+        : { text: `Version ${v} is available`, button: 'Download', action: 'download' };
+    case 'downloading':
+      return { text: `Downloading ${v} · ${u.percent}%`, button: 'Check for updates', busy: true };
+    case 'ready':
+      return { text: `Version ${v} is ready to install`, button: 'Restart to update', action: 'install', primary: true, pill: `Restart to update to ${v}` };
+    case 'error':
+      return { text: "Couldn't check for updates", title: u.error, button: 'Try again', action: 'check' };
+    default:
+      return { text: 'Checks automatically in the background', button: 'Check for updates', action: 'check' };
+  }
+}
+
+function renderUpdate() {
+  const u = state.update || { status: 'disabled' };
+  const v = updateView(u, state.settings.autoUpdate);
+  $('app-version').textContent = state.version || '';
+  $('update-status').textContent = v.text;
+  $('update-status').title = v.title || '';
+  const btn = $('update-action');
+  btn.hidden = !v.button;
+  btn.textContent = v.button || '';
+  btn.disabled = !!v.busy;
+  btn.className = `btn${v.primary ? ' primary' : ''}`;
+  btn.dataset.action = v.action || '';
+  $('set-autoupdate').checked = !!state.settings.autoUpdate;
+  $('set-autoupdate').disabled = u.status === 'disabled' || !u.canAutoInstall;
+
+  const pill = $('update-pill');
+  pill.hidden = !v.pill;
+  pill.dataset.action = v.action || '';
+  if (v.pill) pill.replaceChildren(el('span', { class: 'dot' }), v.pill);
+}
+
+async function runUpdateAction(action) {
+  if (action === 'check') window.beam.checkUpdates();
+  else if (action === 'download') window.beam.downloadUpdate();
+  else if (action === 'install') {
+    const res = await window.beam.installUpdate();
+    if (res && !res.ok && res.error) $('update-status').textContent = res.error;
+  }
+}
+
+$('update-action').addEventListener('click', (e) => runUpdateAction(e.currentTarget.dataset.action));
+$('update-pill').addEventListener('click', (e) => runUpdateAction(e.currentTarget.dataset.action));
+$('set-autoupdate').addEventListener('change', (e) => saveSetting({ autoUpdate: e.target.checked }));
+
 // ------------------------------------------------------------------ dialogs
 
 function codeBoxes(sas) {
@@ -582,6 +643,7 @@ window.addEventListener('focus', () => {
 function render(keys) {
   const has = (k) => !keys || keys.includes(k);
   if (has('settings') || has('self') || has('shortcutOk')) renderSettings();
+  if (has('update') || has('settings') || has('version')) renderUpdate();
   if (has('devices') || has('history') || has('settings') || has('shortcutOk')) renderSidebar();
   if (has('devices') || has('history') || has('transfers')) {
     if (view.selected && !device(view.selected)) view.paneKey = null;

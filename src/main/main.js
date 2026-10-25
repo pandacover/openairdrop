@@ -27,6 +27,7 @@ const { Discovery } = require('../core/discovery');
 const { generateIdentity, exportIdentity, importIdentity, formatFingerprint } = require('../core/identity');
 const { sanitizeFileName } = require('../core/files');
 const { JsonStore } = require('./store');
+const { Updater } = require('./updater');
 
 // ------------------------------------------------------------------ startup
 
@@ -53,7 +54,7 @@ const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+Space';
 const POPUP_WIDTH = 600;
 
-let settings, trustedStore, historyStore, identity, node, discovery;
+let settings, trustedStore, historyStore, identity, node, discovery, updater;
 let tray = null;
 let mainWindow = null;
 let popupWindow = null;
@@ -139,6 +140,8 @@ function publicState() {
     devices: listDevices(),
     history: historyStore.data.items,
     transfers: [...transfers.values()],
+    version: app.getVersion(),
+    update: updater ? updater.state : { status: 'disabled' },
   };
 }
 
@@ -517,9 +520,40 @@ function updateTray() {
       { label: 'Open Beam', click: showMain },
       { label: 'Open Received Files', click: () => openDownloads() },
       { type: 'separator' },
+      updater?.state.status === 'ready'
+        ? { label: `Restart to Update to ${updater.state.version}`, click: () => installUpdate() }
+        : { label: 'Check for Updates', enabled: !!updater && updater.state.status !== 'disabled', click: () => updater.check() },
       { label: 'Quit Beam', click: () => app.quit() },
     ])
   );
+}
+
+// ----------------------------------------------------------------- updates
+
+function hasActiveTransfers() {
+  return [...transfers.values()].some((t) => t.status === 'active');
+}
+
+function installUpdate() {
+  // An install mid-transfer would cut it off and leave a partial file behind.
+  if (hasActiveTransfers()) return { ok: false, error: 'Wait for transfers to finish' };
+  quitting = true; // let windows close instead of hiding to the tray
+  return { ok: updater.installNow() };
+}
+
+function startUpdater() {
+  // Test profiles stay off the updater unless a feed is given explicitly.
+  updater = new Updater({ autoInstallEnabled: () => settings.data.autoUpdate, enabled: !profileDir || !!process.env.BEAM_UPDATE_URL });
+  updater.on('change', (s) => {
+    pushState('update');
+    if (s.status === 'ready' || s.status === 'up-to-date') updateTray();
+    console.log(`[updater] ${s.status}${s.version ? ' ' + s.version : ''}${s.status === 'downloading' ? ` ${s.percent}%` : ''}${s.error ? ' ' + s.error : ''}`);
+  });
+  updater.on('ready', (version) => notify(`Beam ${version} is ready`, 'It installs when you quit Beam, or restart now from the tray.', showMain));
+  updater.on('available', (version) => {
+    if (!updater.state.canAutoInstall) notify(`Beam ${version} is available`, 'Click to download it.', () => updater.openDownloadPage());
+  });
+  updater.start().catch((e) => console.error('updater failed to start', e));
 }
 
 function createTray() {
@@ -587,7 +621,7 @@ function registerIpc() {
   });
 
   handle('update-settings', (patch) => {
-    const allowed = ['deviceName', 'autoAccept', 'copyText', 'notifications', 'launchAtLogin', 'shortcut'];
+    const allowed = ['deviceName', 'autoAccept', 'copyText', 'notifications', 'launchAtLogin', 'shortcut', 'autoUpdate'];
     const next = { ...settings.data };
     for (const k of allowed) if (patch && k in patch) next[k] = patch[k];
     next.deviceName = String(next.deviceName || '').trim().slice(0, 64) || os.hostname();
@@ -662,6 +696,9 @@ function registerIpc() {
       }
     })
   );
+  handle('check-updates', () => updater?.check());
+  handle('download-update', () => (updater?.state.canAutoInstall ? updater.download() : updater?.openDownloadPage()));
+  handle('install-update', () => installUpdate());
   handle('open-main', () => {
     popupWindow?.hide();
     showMain();
@@ -695,6 +732,7 @@ app.whenReady().then(async () => {
     copyText: false,
     notifications: true,
     launchAtLogin: false,
+    autoUpdate: true,
     lastDeviceId: null,
   });
   trustedStore = new JsonStore(path.join(dataDir, 'trusted-devices.json'), (d) => ({ devices: d.devices || {} }));
@@ -707,5 +745,6 @@ app.whenReady().then(async () => {
   createPopup();
   createTray();
   registerShortcut(settings.data.shortcut);
+  startUpdater();
   console.log(`Beam ready: ${deviceName()} (${identity.fp}) listening on ${listenPort}`);
 });

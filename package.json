@@ -44,12 +44,19 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Beam-Setup-${version}.${ext}"
     },
     "mac": {
       "target": [
         {
           "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
           "arch": [
             "arm64"
           ]
@@ -59,7 +66,8 @@
       "icon": "build/icon.png",
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "Beam finds and sends files to your other devices on the local network."
-      }
+      },
+      "artifactName": "Beam-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
@@ -68,11 +76,21 @@
       ],
       "category": "Network",
       "icon": "build/icon.png"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "pandacover",
+        "repo": "openairdrop"
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^45.0.0",
     "electron-builder": "^26.18.0",
     "playwright-core": "^1.64.1"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

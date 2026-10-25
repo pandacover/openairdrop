@@ -27,6 +27,7 @@
           <input type="text" id="add-input" placeholder="192.168.1.20" aria-label="Device address" />
           <div id="add-status" class="add-status"></div>
         </form>
+        <button class="update-pill" id="update-pill" hidden></button>
         <button class="text-btn" id="add-toggle"><span data-icon="plus" data-size="14"></span> Add by address</button>
         <div class="shortcut-hint" id="shortcut-hint" title="Open quick send from anywhere"></div>
       </div>
@@ -132,6 +133,18 @@
             <label class="row">
               <span class="label">Notifications</span>
               <input type="checkbox" class="switch" id="set-notify" />
+            </label>
+          </div>
+
+          <h3>Updates</h3>
+          <div class="group">
+            <div class="row">
+              <span class="label"><span>Beam <span id="app-version"></span></span><small id="update-status"></small></span>
+              <button class="btn" id="update-action"></button>
+            </div>
+            <label class="row">
+              <span class="label">Install updates automatically</span>
+              <input type="checkbox" class="switch" id="set-autoupdate" />
             </label>
           </div>
 

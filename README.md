@@ -36,6 +36,23 @@ Received files go to `Downloads/Beam` (you can change this in Settings). Receive
 
 You can also drag files onto the popup. To change the shortcut, open **Settings**, click the shortcut box and press a new combination.
 
+## Updates
+
+Installed copies check GitHub Releases for a newer version about 15 seconds after launch, then every 4 hours.
+
+- **Windows:** the update downloads in the background and installs silently when you quit Beam. You can also install it right away: click **Restart to update** in the sidebar, the tray menu or Settings. Beam won't restart while a transfer is in progress.
+- **macOS:** this works the same way, but only for builds signed with a Developer ID certificate, because macOS only applies updates to properly signed apps. Ad-hoc signed builds (the default when the CI has no certificate) can only *check*. They show "Version x.y.z is available", and **Download…** opens the releases page.
+- **Settings → Updates** has a **Check for updates** button and an **Install updates automatically** toggle. With the toggle off, Beam still tells you about new versions but waits for you to click **Download**.
+- Development runs (`npm start`) never update themselves.
+
+How a release reaches users:
+
+1. Bump `version` in `package.json`, then commit.
+2. Tag the commit `v<version>` (for example `git tag v1.0.1 && git push --tags`). CI checks that the tag matches `package.json`.
+3. CI builds and attaches the installers plus `latest.yml` / `latest-mac.yml` to a **draft** release. Updaters ignore drafts, so nothing ships until you click **Publish**.
+
+The repository must be **public**, since installed apps read releases without a token. For a self-hosted feed, put the build output (installers + `latest*.yml`) on any HTTPS server and start Beam with `BEAM_UPDATE_URL=https://your.server/path/`.
+
 ## Building installers
 
 ### GitHub Actions
@@ -44,8 +61,8 @@ You can also drag files onto the popup. To change the shortcut, open **Settings*
 
 | Job | Runner | Output (artifact) |
 | --- | --- | --- |
-| Windows x64 | `windows-latest` | `Beam Setup x.y.z.exe` (NSIS), after `npm test` passes |
-| macOS Apple silicon (arm64 only) | `macos-14` | `Beam-x.y.z-arm64.dmg` |
+| Windows x64 | `windows-latest` | `Beam-Setup-x.y.z.exe` (NSIS) + `latest.yml`, after `npm test` passes |
+| macOS Apple silicon (arm64 only) | `macos-14` | `Beam-x.y.z-arm64.dmg`, plus the `.zip` and `latest-mac.yml` used by the updater |
 
 To publish a release, push a tag such as `v1.0.0`. The installers are then attached to a **draft** GitHub Release for you to review and publish.
 
@@ -62,7 +79,7 @@ The Windows installer is unsigned, so SmartScreen shows a warning the first time
 ### Locally
 
 ```bash
-npm run dist:win     # NSIS installer, x64   -> dist/Beam Setup x.y.z.exe
+npm run dist:win     # NSIS installer, x64   -> dist/Beam-Setup-x.y.z.exe
 npm run dist:mac     # DMG, Apple silicon    (must be built on macOS)
 npm run dist:linux   # AppImage + .deb       (build on Linux)
 ```
@@ -80,6 +97,7 @@ npm run dist:linux   # AppImage + .deb       (build on Linux)
 | Untrusted input | Remote file names are sanitized (no path traversal, no reserved Windows names) and never overwrite existing files. Frame size, text size and file count are all capped, and stalled or unauthenticated connections time out. |
 | Discovery | Broadcast beacons contain only a display name, a public fingerprint and a port. They are never trusted: the handshake verifies that the device at an address really has the expected identity. |
 | Local data | The activity history (`history.json` in the app's data folder) keeps sent and received **text in plain text** on each device, so you can copy it later. **Activity → Clear** deletes it. This copy stays on your own disk; nothing is stored on the network. |
+| Updates | Downloaded over HTTPS from GitHub Releases and checked against the SHA-512 in `latest.yml` before installing. That check catches corruption, but it can't protect against a compromised GitHub account: the hash comes from the same release. Signing the Windows installer adds a publisher check; on macOS, Squirrel only installs updates signed by the same Developer ID as the running app. |
 | App hardening | `contextIsolation`, `sandbox`, no `nodeIntegration`, a strict CSP, navigation and new windows blocked. File bytes never cross IPC; the main process streams from disk. |
 
 Wire protocol: see `src/core/handshake.js` (handshake) and `src/core/node.js` (messages).
