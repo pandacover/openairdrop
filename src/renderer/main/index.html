@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:" />
+    <title>Beam</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="main.css" />
+  </head>
+  <body>
+    <aside>
+      <div class="brand"><img src="../../../assets/icon.png" alt="" /> Beam</div>
+      <div class="me">
+        <div class="me-name" id="me-name"></div>
+        <div class="muted small">This device · port <span id="me-port"></span></div>
+      </div>
+      <nav>
+        <button class="nav active" data-view="devices">📡 Devices</button>
+        <button class="nav" data-view="activity">🕘 Activity <span id="activity-badge" class="badge hidden"></span></button>
+        <button class="nav" data-view="settings">⚙️ Settings</button>
+      </nav>
+      <div class="hint small muted">
+        Quick send from anywhere:<br />
+        <kbd id="shortcut-hint"></kbd>
+        <div id="shortcut-warn" class="warn hidden">Shortcut unavailable — pick another in Settings.</div>
+      </div>
+    </aside>
+
+    <section id="view-devices" class="view">
+      <header>
+        <div>
+          <h1>Devices</h1>
+          <p class="muted">Devices running Beam on your network. Pair once, then send instantly.</p>
+        </div>
+        <button id="refresh" class="ghost" title="Search again">⟳ Refresh</button>
+      </header>
+      <div id="device-list" class="device-list"></div>
+      <form id="add-form" class="add-form">
+        <input type="text" id="add-input" placeholder="Not showing up? Add by address, e.g. 192.168.1.20" />
+        <button type="submit">Add</button>
+      </form>
+      <div id="add-status" class="small muted"></div>
+
+      <div id="composer" class="composer hidden">
+        <div class="composer-head">
+          Send to <strong id="composer-target"></strong>
+        </div>
+        <textarea id="composer-text" rows="3" placeholder="Type a message, paste or drop files…"></textarea>
+        <div id="composer-files" class="files"></div>
+        <div class="composer-actions">
+          <button type="button" class="ghost" id="composer-attach">📎 Attach files</button>
+          <span id="composer-status" class="small muted"></span>
+          <button type="button" class="primary" id="composer-send">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-activity" class="view hidden">
+      <header>
+        <div>
+          <h1>Activity</h1>
+          <p class="muted">Messages and files sent and received on this device.</p>
+        </div>
+        <div class="row">
+          <button id="open-downloads" class="ghost">📂 Received files</button>
+          <button id="clear-history" class="ghost">Clear</button>
+        </div>
+      </header>
+      <div id="transfers"></div>
+      <div id="history" class="history"></div>
+    </section>
+
+    <section id="view-settings" class="view hidden">
+      <header>
+        <div>
+          <h1>Settings</h1>
+        </div>
+      </header>
+      <div class="settings">
+        <label class="field">
+          <span>Device name</span>
+          <input type="text" id="set-name" maxlength="64" />
+        </label>
+        <label class="field">
+          <span>Quick send shortcut</span>
+          <div class="row">
+            <input type="text" id="set-shortcut" readonly title="Click, then press a key combination" />
+            <button type="button" id="reset-shortcut" class="ghost">Reset</button>
+          </div>
+          <small class="muted">Click the box and press the new combination.</small>
+          <small id="shortcut-error" class="error"></small>
+        </label>
+        <label class="field">
+          <span>Save received files to</span>
+          <div class="row">
+            <input type="text" id="set-dir" readonly />
+            <button type="button" id="choose-dir">Change…</button>
+          </div>
+        </label>
+        <label class="toggle"><input type="checkbox" id="set-auto" /> Accept transfers from paired devices automatically</label>
+        <label class="toggle"><input type="checkbox" id="set-copy" /> Copy received text to the clipboard</label>
+        <label class="toggle"><input type="checkbox" id="set-notify" /> Show notifications</label>
+        <label class="toggle" id="login-row"><input type="checkbox" id="set-login" /> Start Beam when I log in</label>
+
+        <div class="identity">
+          <div class="small muted">Device identity fingerprint</div>
+          <div class="mono" id="set-fp"></div>
+          <p class="small muted">
+            Each device has its own key pair, generated locally. Transfers go directly between devices over the local network,
+            encrypted end-to-end (X25519 + AES-256-GCM, Ed25519-authenticated). Nothing is stored or relayed by any server.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-card" id="modal-card"></div>
+    </div>
+
+    <script src="../shared/util.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

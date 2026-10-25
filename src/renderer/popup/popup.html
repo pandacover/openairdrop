@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' file: data:" />
+    <title>Beam Quick Send</title>
+    <link rel="stylesheet" href="../shared/base.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div class="brand"><span class="logo"></span>Send to</div>
+        <div id="devices" class="devices" role="radiogroup" aria-label="Target device"></div>
+        <button class="ghost close" id="close" title="Close (Esc)">✕</button>
+      </header>
+
+      <div id="empty" class="empty hidden">
+        <p>No paired devices yet.</p>
+        <p class="muted small">Open Beam on both devices and pair them once — after that, they show up here.</p>
+        <button class="primary" id="open-main">Open Beam</button>
+      </div>
+
+      <main id="composer">
+        <textarea id="text" placeholder="Type a message, paste, or drop files here…" spellcheck="true"></textarea>
+        <div id="files" class="files"></div>
+      </main>
+
+      <footer>
+        <button class="ghost" id="attach" title="Attach files (Ctrl+O)">📎 Attach</button>
+        <div id="status" class="status muted small">Enter to send · Shift+Enter for new line · Esc to close</div>
+        <button class="primary" id="send">Send</button>
+      </footer>
+      <div class="progress hidden" id="progress"><div></div></div>
+      <div id="drop" class="drop hidden">Drop to attach</div>
+    </div>
+    <script src="../shared/util.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

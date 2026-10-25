@@ -1,0 +1,96 @@
+# Beam
+
+Send text and files straight to your other computers on the same network: end-to-end encrypted, peer-to-peer, and nothing stored in between.
+Runs on Windows, macOS and Linux (Electron).
+
+- **Quick send from anywhere.** Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> (<kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> on macOS) to open a small floating box. Type, paste or drop files, then press <kbd>Enter</kbd>.
+- **Finds devices automatically** over UDP broadcast. If your network blocks broadcasts, you can add a device by IP address.
+- **Direct TCP between devices.** No server, relay or cloud, so nothing is stored on the network. Files are streamed in 256 KB encrypted chunks, with backpressure.
+- **End-to-end encrypted and authenticated.** Each device has its own key pair. You pair two devices once by comparing a 6-digit code.
+
+## Getting started
+
+```bash
+npm install
+npm start
+```
+
+Do this on two computers that are on the same Wi-Fi or LAN:
+
+1. Each computer lists the other under **Devices**. Click **Pair** on one of them.
+2. Both screens show a 6-digit code. If the codes match, confirm on **both** devices.
+3. You're done. Press the shortcut, pick the device (<kbd>Alt</kbd>+<kbd>1..9</kbd>), type or attach, and press <kbd>Enter</kbd>.
+
+Received files go to `Downloads/Beam` (you can change this in Settings). Received text appears under **Activity** and in a notification. You can also have it copied to the clipboard automatically.
+
+### Quick-send popup keys
+
+| Key | Action |
+| --- | --- |
+| <kbd>Enter</kbd> | Send |
+| <kbd>Shift</kbd>+<kbd>Enter</kbd> | New line |
+| <kbd>Ctrl/⌘</kbd>+<kbd>O</kbd> | Attach files |
+| <kbd>Ctrl/⌘</kbd>+<kbd>V</kbd> | Paste files or a screenshot |
+| <kbd>Alt</kbd>+<kbd>1..9</kbd> | Choose target device |
+| <kbd>Esc</kbd> | Close |
+
+You can also drag files onto the popup. To change the shortcut, open **Settings**, click the shortcut box and press a new combination.
+
+## Building installers
+
+```bash
+npm run dist:win     # NSIS installer      -> dist/Beam Setup x.y.z.exe
+npm run dist:mac     # DMG                 (must be built on macOS)
+npm run dist:linux   # AppImage + .deb     (build on Linux)
+```
+
+Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper will warn the first time you open them. To distribute widely, configure code signing in electron-builder.
+
+## Security design
+
+| Concern | How Beam handles it |
+| --- | --- |
+| Identity | Each device generates an Ed25519 key pair on first start. The private key never leaves the device and is encrypted at rest with the OS keystore (DPAPI / Keychain / libsecret) through Electron `safeStorage`. |
+| Key exchange | Every connection uses fresh X25519 ephemeral keys (forward secrecy). Both sides sign the full handshake transcript (role, both identity keys, both ephemeral keys, names) with their Ed25519 keys (mutual authentication). |
+| Encryption | AES-256-GCM. Each direction has its own HKDF-SHA256 key. Nonces are implicit 64-bit counters, so any replayed, reordered, dropped or modified frame fails authentication and the connection is closed. |
+| Pairing / MITM | A 6-digit code is derived from the handshake transcript. The initiator first sends a hash commitment to its keys, so an attacker in the middle can't search for colliding codes; each attempt has a one-in-a-million chance. Both users must confirm. After pairing, keys are pinned. |
+| Authorization | Devices that aren't paired can only send a pairing request. Everything else is rejected before any data is processed. **Forget** revokes a device immediately. |
+| Integrity | Each file is checked with SHA-256 end to end. Files are written to a `.beampart` temp file and only renamed after they verify. |
+| Untrusted input | Remote file names are sanitized (no path traversal, no reserved Windows names) and never overwrite existing files. Frame size, text size and file count are all capped, and stalled or unauthenticated connections time out. |
+| Discovery | Broadcast beacons contain only a display name, a public fingerprint and a port. They are never trusted: the handshake verifies that the device at an address really has the expected identity. |
+| App hardening | `contextIsolation`, `sandbox`, no `nodeIntegration`, a strict CSP, navigation and new windows blocked. File bytes never cross IPC; the main process streams from disk. |
+
+Wire protocol: see `src/core/handshake.js` (handshake) and `src/core/node.js` (messages).
+
+## Things to know
+
+- **Firewall prompt on first launch.** Windows Defender Firewall and macOS ask whether Beam may accept incoming connections. Allow it on **private** networks. If you click Cancel, the device can still send but can't receive. To fix that, allow Beam in the firewall settings.
+- **Ports:** UDP 47811 (discovery) and TCP 47812 (transfers). If 47812 is taken, Beam picks a free port and advertises it.
+- **Linux global shortcut:** works on X11. On Wayland, most compositors don't allow apps to grab global shortcuts. Bind a system shortcut to open the Beam window instead, or use the tray icon. *Start at login* is not available on Linux; add Beam to your desktop's autostart instead.
+- **Networks with client isolation** (many guest and public Wi-Fi networks) block device-to-device traffic. Beam can't work on them, and that is by design.
+- Folders aren't sent directly. Zip them first.
+
+## Development
+
+```bash
+npm test               # protocol/crypto/transfer tests (plain Node, no Electron)
+npm run test:e2e       # launches two real app instances, pairs them via the UI, sends text + a 20 MiB file
+npm run start:second   # run a second instance with its own identity (for testing on one machine)
+npm run icons          # regenerate icons
+```
+
+`--beam-profile=<dir>` gives an instance its own identity and data, and `--beam-port=<n>` sets its TCP port.
+
+> If `npm start` prints `Cannot read properties of undefined (reading 'setPath')`, your shell has `ELECTRON_RUN_AS_NODE=1` set (some IDEs and tools export it). Unset it and try again.
+
+```
+src/core/      networking + crypto, no Electron dependency (tested with node --test)
+  identity.js    Ed25519 identities and fingerprints
+  handshake.js   authenticated key exchange and the pairing code
+  framing.js     length-prefixed frames + AES-GCM channel
+  node.js        server/client: pairing, offers, text and file streaming
+  discovery.js   UDP broadcast presence
+src/main/      Electron main process: tray, global shortcut, windows, IPC, storage
+src/preload/   the only bridge between UI and main (contextBridge)
+src/renderer/  main window + quick-send popup (plain HTML/CSS/JS)
+```
