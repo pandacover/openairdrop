@@ -14,8 +14,8 @@
     "test:e2e": "node scripts/e2e.js",
     "icons": "node scripts/gen-icons.js",
     "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win --x64",
+    "dist:mac": "electron-builder --mac --arm64",
     "dist:linux": "electron-builder --linux",
     "pack": "electron-builder --dir"
   },
@@ -33,7 +33,12 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png"
     },
@@ -43,7 +48,12 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",

@@ -1,3 +1,4 @@
 node_modules/
 dist/
 .profiles/
+adhoc-build.json

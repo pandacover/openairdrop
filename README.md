@@ -38,13 +38,34 @@ You can also drag files onto the popup. To change the shortcut, open **Settings*
 
 ## Building installers
 
-```bash
-npm run dist:win     # NSIS installer      -> dist/Beam Setup x.y.z.exe
-npm run dist:mac     # DMG                 (must be built on macOS)
-npm run dist:linux   # AppImage + .deb     (build on Linux)
-```
+### GitHub Actions
 
-Unsigned builds work, but Windows SmartScreen and macOS Gatekeeper will warn the first time you open them. To distribute widely, configure code signing in electron-builder.
+`.github/workflows/build.yml` builds on every push to `main`, on pull requests, and on demand from the Actions tab:
+
+| Job | Runner | Output (artifact) |
+| --- | --- | --- |
+| Windows x64 | `windows-latest` | `Beam Setup x.y.z.exe` (NSIS), after `npm test` passes |
+| macOS Apple silicon (arm64 only) | `macos-14` | `Beam-x.y.z-arm64.dmg` |
+
+To publish a release, push a tag such as `v1.0.0`. The installers are then attached to a **draft** GitHub Release for you to review and publish.
+
+**macOS signing.** If you haven't added signing secrets, the Mac app is *ad-hoc* signed. Apple silicon requires at least that much before it will run an app. Gatekeeper still blocks downloaded ad-hoc apps, so on first launch, right-click the app → **Open**, or run `xattr -cr /Applications/Beam.app`. To sign properly and notarize, add these repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `MAC_CERT_P12_BASE64` | Developer ID Application certificate (.p12), base64-encoded |
+| `MAC_CERT_PASSWORD` | Password for the .p12 |
+| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | Optional. Turns on notarization. |
+
+The Windows installer is unsigned, so SmartScreen shows a warning the first time it runs.
+
+### Locally
+
+```bash
+npm run dist:win     # NSIS installer, x64   -> dist/Beam Setup x.y.z.exe
+npm run dist:mac     # DMG, Apple silicon    (must be built on macOS)
+npm run dist:linux   # AppImage + .deb       (build on Linux)
+```
 
 ## Security design
 
